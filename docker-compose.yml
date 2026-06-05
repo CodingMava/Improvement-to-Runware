@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  # Python Flask REST API Gateway
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - SUPABASE_URL=https://htnaasasgneagoezgtmn.supabase.co
+      - SUPABASE_KEY=sb_publishable_CyXzms4auQ9s8KM6UUTyHQ__XsV4iiH
+    restart: unless-stopped
+
+  # Nginx Dynamic UI Server
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

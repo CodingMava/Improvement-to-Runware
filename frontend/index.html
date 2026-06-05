@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RunBench Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #090d16 0%, #05070f 100%);
+            color: #f1f5f9;
+            font-family: system-ui, sans-serif;
+            min-height: 100vh;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12">
+    <div class="max-w-6xl mx-auto">
+        
+        <!-- Header -->
+        <header class="mb-12 flex flex-col md:flex-row justify-between items-start md:items-center border-b border-white/5 pb-6">
+            <div>
+                <span class="text-xs font-mono text-blue-400 uppercase tracking-widest px-2 py-1 bg-blue-500/10 rounded-md">Live Testing Harness</span>
+                <h1 class="text-3xl font-black mt-2 tracking-tight text-white">Runware High-Throughput Benchmarker</h1>
+            </div>
+            <div class="text-right">
+                <p class="text-xs text-gray-500 font-mono">Target: api.runware.ai/v1</p>
+                <p class="text-xs text-green-400 font-mono flex items-center gap-1.5 mt-1">
+                    <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> Pipeline Operational
+                </p>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Controls Form -->
+            <div class="lg:col-span-1 flex flex-col gap-6">
+                <div class="glass-panel p-6">
+                    <h2 class="text-sm font-semibold tracking-wider uppercase text-gray-400 mb-4">Harness Configuration</h2>
+                    
+                    <div class="mb-4">
+                        <label class="block text-xs font-mono text-gray-400 mb-2">Test Prompt</label>
+                        <textarea id="promptInput" rows="3" class="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm focus:outline-none focus:border-blue-500 transition-colors text-white">A highly detailed, cinematic cyberpunk street scene, photorealistic, sub-second generation</textarea>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-xs font-mono text-gray-400 mb-2">Target Engines</label>
+                        <div class="space-y-3 text-sm">
+                            <label class="flex items-center gap-2 text-gray-300 cursor-pointer">
+                                <input type="checkbox" checked value="google-nano-banana-pro" class="model-checkbox rounded bg-white/5 border-white/10 text-blue-600 focus:ring-0"> google-nano-banana-pro
+                            </label>
+                            <label class="flex items-center gap-2 text-gray-300 cursor-pointer">
+                                <input type="checkbox" checked value="flux-1.1-pro" class="model-checkbox rounded bg-white/5 border-white/10 text-blue-600 focus:ring-0"> flux-1.1-pro
+                            </label>
+                            <label class="flex items-center gap-2 text-gray-300 cursor-pointer">
+                                <input type="checkbox" checked value="runware:101@1" class="model-checkbox rounded bg-white/5 border-white/10 text-blue-600 focus:ring-0"> runware:101@1
+                            </label>
+                        </div>
+                    </div>
+
+                    <button onclick="executeStressTest()" id="triggerBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]">
+                        Saturate & Benchmark Pipeline
+                    </button>
+                </div>
+            </div>
+
+            <!-- Visualizer Logs -->
+            <div class="lg:col-span-2 flex flex-col gap-6">
+                <div class="glass-panel p-6 flex-1">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-sm font-semibold tracking-wider uppercase text-gray-400">Real-Time Telemetry Logs</h2>
+                        <button onclick="loadLatestTelemetry()" id="refreshBtn" class="bg-white/5 hover:bg-white/10 text-xs text-blue-400 px-3 py-1.5 rounded-md border border-white/10 transition-colors">
+                            Refresh Matrix
+                        </button>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="border-b border-white/10 text-gray-500 text-xs font-mono uppercase">
+                                    <th class="pb-3">Timestamp</th>
+                                    <th class="pb-3">Model Engine ID</th>
+                                    <th class="pb-3">Actual Latency</th>
+                                    <th class="pb-3">Est. Compute Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody id="telemetryRows" class="font-mono">
+                                <!-- Dynamic rows insert here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadLatestTelemetry() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.innerText = "Syncing...";
+            
+            try {
+                const r = await fetch('http://localhost:5000/api/stats');
+                const res = await r.json();
+                const tbody = document.getElementById('telemetryRows');
+                tbody.innerHTML = '';
+                
+                if(!res.data || res.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-gray-600 text-xs">No execution telemetry logged yet. Fire the harness above.</td></tr>`;
+                    return;
+                }
+
+                res.data.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-white/[0.02] hover:bg-white/[0.02] transition-colors";
+                    
+                    const timeString = item.created_at ? new Date(item.created_at).toLocaleTimeString() : "Just Now";
+                    const displayCost = typeof item.cost === 'number' ? item.cost : parseFloat(item.cost || 0);
+
+                    tr.innerHTML = `
+                        <td class="py-3.5 text-gray-500 text-xs">${timeString}</td>
+                        <td class="py-3.5 text-blue-400 font-bold text-xs">${item.model_name}</td>
+                        <td class="py-3.5 text-emerald-400 font-bold">${item.latency_ms} <span class="text-[10px] text-gray-500">ms</span></td>
+                        <td class="py-3.5 text-purple-400">$${displayCost.toFixed(5)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) {
+                console.error("Pipeline Sync Error:", e);
+            } finally {
+                refreshBtn.innerText = "Refresh Matrix";
+            }
+        }
+
+        async function executeStressTest() {
+            const btn = document.getElementById('triggerBtn');
+            const prompt = document.getElementById('promptInput').value;
+            const checkboxes = document.querySelectorAll('.model-checkbox:checked');
+            
+            const selectedModels = Array.from(checkboxes).map(cb => cb.value);
+            if(selectedModels.length === 0) {
+                alert("Select at least one active pipeline engine.");
+                return;
+            }
+
+            btn.innerText = "Saturating Endpoints...";
+            btn.classList.add('opacity-40', 'pointer-events-none');
+
+            try {
+                const r = await fetch('http://localhost:5000/api/benchmark', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ models: selectedModels, prompt: prompt })
+                });
+                await r.json();
+                
+                // Force a clean state refresh right after execution finishes
+                await loadLatestTelemetry();
+            } catch(e) {
+                alert("Harness Error: Ensure your Flask server is up on port 5000.");
+            } finally {
+                btn.innerText = "Saturate & Benchmark Pipeline";
+                btn.classList.remove('opacity-40', 'pointer-events-none');
+            }
+        }
+
+        // Initial setup run on viewport load
+        loadLatestTelemetry();
+    </script>
+</body>
+</html>
